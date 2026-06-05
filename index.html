@@ -358,13 +358,18 @@
     var total = 0; data.forEach(function(d){total+=d.value;});
     if (!total) return '<div style="color:#ccc;font-size:.8rem;text-align:center;padding:.75rem">Aucune donnée</div>';
     var R=46,CX=50,CY=50; var paths=''; var startA = -Math.PI/2;
-    data.forEach(function(d) {
-      var a = (d.value/total)*2*Math.PI; var endA = startA+a;
-      var x1=(CX+R*Math.cos(startA)).toFixed(1),y1=(CY+R*Math.sin(startA)).toFixed(1);
-      var x2=(CX+R*Math.cos(endA)).toFixed(1),y2=(CY+R*Math.sin(endA)).toFixed(1);
-      paths += '<path d="M'+CX+','+CY+' L'+x1+','+y1+' A'+R+','+R+' 0 '+(a>Math.PI?1:0)+',1 '+x2+','+y2+' Z" fill="'+d.color+'"/>';
-      startA = endA;
-    });
+    // Cas dégénéré : une seule catégorie = 100% → arc invalide, utiliser un cercle plein
+    if (data.length === 1) {
+      paths = '<circle cx="'+CX+'" cy="'+CY+'" r="'+R+'" fill="'+data[0].color+'"/>';
+    } else {
+      data.forEach(function(d) {
+        var a = (d.value/total)*2*Math.PI; var endA = startA+a;
+        var x1=(CX+R*Math.cos(startA)).toFixed(1),y1=(CY+R*Math.sin(startA)).toFixed(1);
+        var x2=(CX+R*Math.cos(endA)).toFixed(1),y2=(CY+R*Math.sin(endA)).toFixed(1);
+        paths += '<path d="M'+CX+','+CY+' L'+x1+','+y1+' A'+R+','+R+' 0 '+(a>Math.PI?1:0)+',1 '+x2+','+y2+' Z" fill="'+d.color+'"/>';
+        startA = endA;
+      });
+    }
     var legend = data.map(function(d) {
       return '<div style="display:flex;align-items:center;gap:.35rem;font-size:.72rem;margin:.18rem 0">'
         +'<div style="width:9px;height:9px;border-radius:2px;flex-shrink:0;background:'+d.color+'"></div>'
@@ -460,7 +465,6 @@
       var cur = new URL(location.href);
       if (dest.origin === cur.origin && dest.pathname === cur.pathname && !dest.hash) {
         e.preventDefault();
-        e.stopPropagation();
         window.location.hash = '/';
       }
     } catch(err) {}
@@ -789,7 +793,7 @@
         var k = bucketKey(e.date, gran);
         if (stackedCounts[k] && stackedCounts[k][e.mandate] !== undefined) stackedCounts[k][e.mandate] += e.nbHours;
       });
-      var stackedData = bks.map(function(b) { return { values: stackedCounts[b] }; });
+      var stackedData = bks.map(function(b) { return { label: b, values: stackedCounts[b] }; });
 
       // Total credit from mandatsDetail
       var totalCredit = 0;
@@ -812,13 +816,13 @@
         var totalC = md.nbHours + (md.nbPostponedHours || 0);
         var pct = totalC > 0 ? Math.min(100, Math.round((md.nbDebitedHours / totalC) * 100)) : 0;
         var hasEvts = mandateHours > 0;
-        var sKey = 'm_' + md.uuid;
+        var sKey = 'm_' + esc(md.uuid);
         var isOpen = S.expandedSections[sKey] === undefined
           ? hasEvts
           : S.expandedSections[sKey] !== false;
 
         html += '<div class="card-inner" style="border-left:3px solid ' + c[1] + ';padding:.65rem .85rem">'
-          + '<div data-section="m_' + md.uuid + '" style="display:flex;justify-content:space-between;align-items:flex-start;cursor:pointer;user-select:none">'
+          + '<div data-section="m_' + esc(md.uuid) + '" style="display:flex;justify-content:space-between;align-items:flex-start;cursor:pointer;user-select:none">'
           + '<div style="flex:1"><div style="font-size:.82rem;font-weight:600">' + esc(md.name) + '</div>'
           + '<div style="font-size:.7rem;color:#6B7280;margin-top:.1rem">Crédit : ' + fmtH(md.nbHours)
           + (md.nbPostponedHours > 0 ? ' + ' + fmtH(md.nbPostponedHours) + ' report' : '') + '</div></div>'
@@ -905,7 +909,7 @@
     };
 
     var ref = panel.querySelector('#cse-ref');
-    if (ref) ref.onclick = function() { charging = false; charger(); };
+    if (ref) ref.onclick = function() { charger(); };
 
     var useTok = panel.querySelector('#cse-use-tok');
     if (useTok) useTok.onclick = function() {
